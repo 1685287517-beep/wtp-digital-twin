@@ -11,6 +11,7 @@ Operator devices (each AUTO or MAN):
 Run:  python -m app.sim_main
 """
 import json
+import random
 import time
 
 from app.bus import make_client, publish_json
@@ -99,6 +100,11 @@ def main():
         # --- assemble the full tag map ------------------------------------
         tags = dict(sensors)
         tags.update(derived)
+        # add a little measurement noise to the analog transmitters so the
+        # trends look like real instruments (the true state stays clean, so
+        # the mass-balance prediction used for stuck-sensor detection is exact)
+        tags["LIT101_level"] = round(sensors["LIT101_level"] + random.gauss(0, 0.004), 4)
+        tags["AIT201_ph"] = round(sensors["AIT201_ph"] + random.gauss(0, 0.02), 3)
         tags["P101_inlet_cmd"] = p101
         tags["P101_inlet_run_fb"] = p101     # motor 'runs' even if a fault blocks flow
         tags["P102_outlet_cmd"] = p102
