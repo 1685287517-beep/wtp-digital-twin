@@ -5,9 +5,6 @@ digital twin of a water-treatment tank, instrumented through a full industrial
 stack — field → PLC → MQTT → historian → dashboard — with an agentic AI
 assistant that detects faults and recommends operator actions in plain language.
 
-> ⚠️ **Viva note (AI use policy §8):** every team member must be able to explain
-> any line of this code. This README and the inline comments are written to help
-> you *understand*, not to substitute for understanding. Read the code.
 
 ## Architecture
 
