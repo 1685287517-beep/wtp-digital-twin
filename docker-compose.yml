@@ -1,0 +1,86 @@
+# Full stack: broker + historian DB + dashboard + our three Python services.
+# Bring it all up with:  docker compose up --build
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+
+  influxdb:
+    image: influxdb:2.7
+    ports:
+      - "8086:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: admin12345
+      DOCKER_INFLUXDB_INIT_ORG: wtp
+      DOCKER_INFLUXDB_INIT_BUCKET: telemetry
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: dev-token-please-change
+    volumes:
+      - influx-data:/var/lib/influxdb2
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    ports:
+      - "3000:3000"
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - influxdb
+
+  sim:
+    build: .
+    command: python -m app.sim_main
+    environment:
+      MQTT_HOST: mosquitto
+    depends_on:
+      - mosquitto
+
+  historian:
+    build: .
+    command: python -m app.historian
+    environment:
+      MQTT_HOST: mosquitto
+      INFLUX_URL: http://influxdb:8086
+      INFLUX_TOKEN: dev-token-please-change
+      INFLUX_ORG: wtp
+      INFLUX_BUCKET: telemetry
+    depends_on:
+      - mosquitto
+      - influxdb
+
+  agent:
+    build: .
+    command: python -m app.agent_main
+    environment:
+      MQTT_HOST: mosquitto
+      # set this in a local .env file to enable the real LLM; otherwise the
+      # built-in playbook is used so the demo still works offline.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      AGENT_MODEL: claude-sonnet-4-6
+    depends_on:
+      - mosquitto
+
+  hmi:
+    build: .
+    command: uvicorn app.hmi:app --host 0.0.0.0 --port 8090
+    environment:
+      MQTT_HOST: mosquitto
+    ports:
+      - "8090:8090"
+    volumes:
+      # live-mount the HMI page so visual tweaks apply on browser refresh (no rebuild)
+      - ./app/static:/opt/wtp/app/static
+    depends_on:
+      - mosquitto
+
+volumes:
+  influx-data:

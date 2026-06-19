@@ -1,0 +1,230 @@
+{
+  "title": "Water Treatment Plant — Live",
+  "uid": "wtp-live",
+  "schemaVersion": 39,
+  "version": 6,
+  "refresh": "1s",
+  "time": { "from": "now-5m", "to": "now" },
+  "panels": [
+    {
+      "id": 10, "type": "stat", "title": "Plant state",
+      "datasource": { "type": "influxdb", "uid": "${DS_INFLUXDB}" },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+      "options": { "colorMode": "background", "graphMode": "none", "textMode": "value", "justifyMode": "center",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "mappings": [
+        { "type": "value", "options": {
+          "0": { "text": "FILLING", "color": "blue", "index": 0 },
+          "1": { "text": "TREATING", "color": "orange", "index": 1 },
+          "2": { "text": "DISCHARGING", "color": "green", "index": 2 } } } ],
+        "thresholds": { "mode": "absolute", "steps": [ { "value": null, "color": "blue" } ] } }, "overrides": [] },
+      "targets": [ { "refId": "A", "query": "from(bucket: \"telemetry\")\n  |> range(start: -5m)\n  |> filter(fn: (r) => r._measurement == \"telemetry\" and r._field == \"PLC_state_code\")" } ]
+    },
+    {
+      "id": 11, "type": "stat", "title": "Tank level",
+      "datasource": { "type": "influxdb", "uid": "${DS_INFLUXDB}" },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+      "options": { "colorMode": "value", "graphMode": "area", "textMode": "value", "justifyMode": "center",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "fieldConfig": { "defaults": { "unit": "lengthm", "decimals": 2, "color": { "mode": "fixed", "fixedColor": "#3274D9" } }, "overrides": [] },
+      "targets": [ { "refId": "A", "query": "from(bucket: \"telemetry\")\n  |> range(start: -5m)\n  |> filter(fn: (r) => r._measurement == \"telemetry\" and r._field == \"LIT101_level\")" } ]
+    },
+    {
+      "id": 12, "type": "stat", "title": "pH",
+      "datasource": { "type": "influxdb", "uid": "${DS_INFLUXDB}" },
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+      "options": { "colorMode": "background", "graphMode": "area", "textMode": "value", "justifyMode": "center",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "fieldConfig": { "defaults": { "decimals": 2, "color": { "mode": "thresholds" },
+        "thresholds": { "mode": "absolute", "steps": [
+          { "value": null, "color": "red" }, { "value": 6, "color": "green" }, { "value": 8, "color": "red" } ] } }, "overrides": [] },
+      "targets": [ { "refId": "A", "query": "from(bucket: \"telemetry\")\n  |> range(start: -5m)\n  |> filter(fn: (r) => r._measurement == \"telemetry\" and r._field == \"AIT201_ph\")" } ]
+    },
+    {
+      "id": 13, "type": "stat", "title": "Dosing output",
+      "datasource": { "type": "influxdb", "uid": "${DS_INFLUXDB}" },
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+      "options": { "colorMode": "value", "graphMode": "area", "textMode": "value", "justifyMode": "center",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 0, "color": { "mode": "fixed", "fixedColor": "purple" } }, "overrides": [] },
+      "targets": [ { "refId": "A", "query": "from(bucket: \"telemetry\")\n  |> range(start: -5m)\n  |> filter(fn: (r) => r._measurement == \"telemetry\" and r._field == \"P201_dose_cmd\")" } ]
+    },
+    {
+      "id": 14, "type": "stat", "title": "Inlet pump P101",
+      "datasource": { "type": "influxdb", "uid": "${DS_INFLUXDB}" },
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+      "options": { "colorMode": "background", "graphMode": "none", "textMode": "value", "justifyMode": "center",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "mappings": [
+        { "type": "value", "options": {
+          "1": { "text": "RUNNING", "color": "green", "index": 0 },
+          "0": { "text": "STOPPED", "color": "#3a3a3a", "index": 1 } } } ],
+        "thresholds": { "mode": "absolute", "steps": [ { "value": null, "color": "#3a3a3a" } ] } }, "overrides": [] },
+      "targets": [ { "refId": "A", "query": "from(bucket: \"telemetry\")\n  |> range(start: -5m)\n  |> filter(fn: (r) => r._measurement == \"telemetry\" and r._field == \"P101_inlet_run_fb\")" } ]
+    },
+    {
+      "id": 15, "type": "stat", "title": "Outlet pump P102",
+      "datasource": { "type": "influxdb", "uid": "${DS_INFLUXDB}" },
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+      "options": { "colorMode": "background", "graphMode": "none", "textMode": "value", "justifyMode": "center",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "mappings": [
+        { "type": "value", "options": {
+          "1": { "text": "RUNNING", "color": "green", "index": 0 },
+          "0": { "text": "STOPPED", "color": "#3a3a3a", "index": 1 } } } ],
+        "thresholds": { "mode": "absolute", "steps": [ { "value": null, "color": "#3a3a3a" } ] } }, "overrides": [] },
+      "targets": [ { "refId": "A", "query": "from(bucket: \"telemetry\")\n  |> range(start: -5m)\n  |> filter(fn: (r) => r._measurement == \"telemetry\" and r._field == \"P102_outlet_run_fb\")" } ]
+    },
+
+    {
+      "id": 25, "type": "canvas", "title": "Process flow (P&ID)",
+      "datasource": { "type": "influxdb", "uid": "${DS_INFLUXDB}" },
+      "gridPos": { "h": 10, "w": 15, "x": 0, "y": 4 },
+      "options": { "inlineEditing": false, "showAdvancedTypes": true, "panZoom": false, "infinitePan": false,
+        "root": { "type": "frame", "name": "Element 0", "elements": [
+          { "type": "text", "name": "lbl-inf", "constraint": { "horizontal": "left", "vertical": "top" },
+            "placement": { "left": 2, "top": 92, "width": 58, "height": 44 },
+            "config": { "text": { "fixed": "INFLUENT", "mode": "fixed" }, "color": { "fixed": "#8ab4f8" }, "size": 12, "align": "center", "valign": "middle" } },
+          { "type": "rectangle", "name": "pipe1", "constraint": { "horizontal": "left", "vertical": "top" },
+            "placement": { "left": 60, "top": 114, "width": 32, "height": 8 },
+            "background": { "color": { "fixed": "#5a6b7b" } }, "config": {} },
+          { "type": "ellipse", "name": "P101", "constraint": { "horizontal": "left", "vertical": "top" },
+            "placement": { "left": 92, "top": 88, "width": 54, "height": 54 },
+            "background": { "color": { "field": "P101_inlet_run_fb" } },
+            "border": { "color": { "fixed": "#ffffff" }, "width": 2 },
+            "config": { "text": { "fixed": "P101", "mode": "fixed" }, "color": { "fixed": "#ffffff" }, "size": 12, "align": "center", "valign": "middle" } },
+          { "type": "metric-value", "name": "fit101", "constraint": { "horizontal": "left", "vertical": "top" },
+            "placement": { "left": 146, "top": 86, "width": 66, "height": 24 },
+            "config": { "text": { "field": "FIT101_inlet_flow", "mode": "field" }, "color": { "fixed": "#9fe1cb" }, "size": 12, "align": "center", "valign": "middle" } },
+          { "type": "rectangle", "name": "pipe2", "constraint": { "horizontal": "left", "vertical": "top" },
+            "placement": { "left": 146, "top": 114, "width": 64, "height": 8 },
+            "background": { "color": { "fixed": "#5a6b7b" } }, "config": {} },
+          { "type": "rectangle", "name": "tank", "constraint": { "horizontal": "left", "vertical": "top" },
+            "placement": { "left": 210, "top": 36, "width": 168, "height": 170 },
+            "background": { "color": { "fixed": "#0b1a2b" } },
+            "border": { "color": { "fixed": "#3274D9" }, "width": 2 },
+            "config": { "text": { "fixed": "TANK T101", "mode": "fixed" }, "color": { "fixed": "#8ab4f8" }, "size": 12, "align": "center", "valign": "top" } },
+          { "type": "metric-value", "name": "ph", "constraint": { "horizontal": "left", "vertical": "top" },
+            "placement": { "left": 218, "top": 56, "width": 152, "height": 32 },
+            "background": { "color": { "field": "AIT201_ph" } },
+            "config": { "text": { "field": "AIT201_ph", "mode": "field" }, "color": { "fixed": "#ffffff" }, "size": 20, "align": "center", "valign": "middle" } },
+          { "type": "text", "name": "lbl-ph", "constraint": { "horizontal": "left", "vertical": "top" },
+            "placement": { "left": 218, "top": 88, "width": 152, "height": 14 },
+            "config": { "text": { "fixed": "pH", "mode": "fixed" }, "color": { "fixed": "#9aa7b5" }, "size": 10, "align": "center", "valign": "middle" } },
+          { "type": "metric-value", "name": "level", "constraint": { "horizontal": "left", "vertical": "top" },
+            "placement": { "left": 218, "top": 106, "width": 152, "height": 36 },
+            "config": { "text": { "field": "LIT101_level", "mode": "field" }, "color": { "fixed": "#3aa3ff" }, "size": 24, "align": "center", "valign": "middle" } },
+          { "type": "text", "name": "lbl-lvl", "constraint": { "horizontal": "left", "vertical": "top" },
+            "placement": { "left": 218, "top": 142, "width": 152, "height": 14 },
+            "config": { "text": { "fixed": "LEVEL", "mode": "fixed" }, "color": { "fixed": "#9aa7b5" }, "size": 10, "align": "center", "valign": "middle" } },
+          { "type": "metric-value", "name": "dose", "constraint": { "horizontal": "left", "vertical": "top" },
+            "placement": { "left": 218, "top": 160, "width": 152, "height": 20 },
+            "config": { "text": { "field": "P201_dose_cmd", "mode": "field" }, "color": { "fixed": "#b39ddb" }, "size": 12, "align": "center", "valign": "middle" } },
+          { "type": "rectangle", "name": "pipe3", "constraint": { "horizontal": "left", "vertical": "top" },
+            "placement": { "left": 378, "top": 114, "width": 56, "height": 8 },
+            "background": { "color": { "fixed": "#5a6b7b" } }, "config": {} },
+          { "type": "metric-value", "name": "fit102", "constraint": { "horizontal": "left", "vertical": "top" },
+            "placement": { "left": 378, "top": 86, "width": 66, "height": 24 },
+            "config": { "text": { "field": "FIT102_outlet_flow", "mode": "field" }, "color": { "fixed": "#9fe1cb" }, "size": 12, "align": "center", "valign": "middle" } },
+          { "type": "ellipse", "name": "P102", "constraint": { "horizontal": "left", "vertical": "top" },
+            "placement": { "left": 434, "top": 88, "width": 54, "height": 54 },
+            "background": { "color": { "field": "P102_outlet_run_fb" } },
+            "border": { "color": { "fixed": "#ffffff" }, "width": 2 },
+            "config": { "text": { "fixed": "P102", "mode": "fixed" }, "color": { "fixed": "#ffffff" }, "size": 12, "align": "center", "valign": "middle" } },
+          { "type": "rectangle", "name": "pipe4", "constraint": { "horizontal": "left", "vertical": "top" },
+            "placement": { "left": 488, "top": 114, "width": 26, "height": 8 },
+            "background": { "color": { "fixed": "#5a6b7b" } }, "config": {} },
+          { "type": "text", "name": "lbl-eff", "constraint": { "horizontal": "left", "vertical": "top" },
+            "placement": { "left": 492, "top": 92, "width": 60, "height": 44 },
+            "config": { "text": { "fixed": "EFFLUENT", "mode": "fixed" }, "color": { "fixed": "#8ab4f8" }, "size": 12, "align": "center", "valign": "middle" } }
+        ] }
+      },
+      "fieldConfig": { "defaults": {}, "overrides": [
+        { "matcher": { "id": "byName", "options": "LIT101_level" }, "properties": [ { "id": "unit", "value": "lengthm" }, { "id": "decimals", "value": 2 } ] },
+        { "matcher": { "id": "byName", "options": "AIT201_ph" }, "properties": [ { "id": "decimals", "value": 2 },
+          { "id": "color", "value": { "mode": "thresholds" } },
+          { "id": "thresholds", "value": { "mode": "absolute", "steps": [ { "value": null, "color": "red" }, { "value": 6, "color": "green" }, { "value": 8, "color": "red" } ] } } ] },
+        { "matcher": { "id": "byName", "options": "FIT101_inlet_flow" }, "properties": [ { "id": "unit", "value": "m3/s" }, { "id": "decimals", "value": 3 } ] },
+        { "matcher": { "id": "byName", "options": "FIT102_outlet_flow" }, "properties": [ { "id": "unit", "value": "m3/s" }, { "id": "decimals", "value": 3 } ] },
+        { "matcher": { "id": "byName", "options": "P201_dose_cmd" }, "properties": [ { "id": "unit", "value": "percentunit" }, { "id": "decimals", "value": 0 } ] },
+        { "matcher": { "id": "byName", "options": "P101_inlet_run_fb" }, "properties": [ { "id": "color", "value": { "mode": "thresholds" } },
+          { "id": "thresholds", "value": { "mode": "absolute", "steps": [ { "value": null, "color": "#3a3a3a" }, { "value": 0.5, "color": "green" } ] } } ] },
+        { "matcher": { "id": "byName", "options": "P102_outlet_run_fb" }, "properties": [ { "id": "color", "value": { "mode": "thresholds" } },
+          { "id": "thresholds", "value": { "mode": "absolute", "steps": [ { "value": null, "color": "#3a3a3a" }, { "value": 0.5, "color": "green" } ] } } ] }
+      ] },
+      "targets": [ { "refId": "A", "query": "from(bucket: \"telemetry\")\n  |> range(start: -1m)\n  |> filter(fn: (r) => r._measurement == \"telemetry\")\n  |> filter(fn: (r) => r._field == \"LIT101_level\" or r._field == \"AIT201_ph\" or r._field == \"FIT101_inlet_flow\" or r._field == \"FIT102_outlet_flow\" or r._field == \"P201_dose_cmd\" or r._field == \"P101_inlet_run_fb\" or r._field == \"P102_outlet_run_fb\")\n  |> last()\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")" } ]
+    },
+    {
+      "id": 5, "type": "table", "title": "Active faults & AI recommendations",
+      "datasource": { "type": "influxdb", "uid": "${DS_INFLUXDB}" },
+      "gridPos": { "h": 10, "w": 9, "x": 15, "y": 4 },
+      "options": { "showHeader": true, "cellHeight": "lg", "sortBy": [ { "displayName": "Time", "desc": true } ] },
+      "fieldConfig": { "defaults": { "custom": { "align": "left", "cellOptions": { "type": "auto", "wrapText": true } } }, "overrides": [
+        { "matcher": { "id": "byName", "options": "Severity" }, "properties": [
+          { "id": "custom.width", "value": 90 },
+          { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "basic" } },
+          { "id": "mappings", "value": [ { "type": "value", "options": {
+            "critical": { "color": "red", "index": 0 },
+            "warning": { "color": "orange", "index": 1 },
+            "info": { "color": "blue", "index": 2 } } } ] } ] },
+        { "matcher": { "id": "byName", "options": "Time" }, "properties": [ { "id": "custom.width", "value": 150 } ] },
+        { "matcher": { "id": "byName", "options": "Fault" }, "properties": [ { "id": "custom.width", "value": 180 } ] }
+      ] },
+      "transformations": [ { "id": "organize", "options": {
+        "renameByName": { "_time": "Time", "fault": "Fault", "severity": "Severity", "_value": "AI recommendation" },
+        "indexByName": { "_time": 0, "severity": 1, "fault": 2, "_value": 3 } } } ],
+      "targets": [ { "refId": "A", "query": "from(bucket: \"telemetry\")\n  |> range(start: -1h)\n  |> filter(fn: (r) => r._measurement == \"agent_events\" and r._field == \"recommendation\")\n  |> group()\n  |> keep(columns: [\"_time\", \"fault\", \"severity\", \"_value\"])\n  |> sort(columns: [\"_time\"], desc: true)\n  |> limit(n: 20)" } ]
+    },
+
+    {
+      "id": 30, "type": "state-timeline", "title": "Plant state over time",
+      "datasource": { "type": "influxdb", "uid": "${DS_INFLUXDB}" },
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 14 },
+      "options": { "showValue": "auto", "mergeValues": true },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "mappings": [
+        { "type": "value", "options": {
+          "FILLING": { "color": "blue", "index": 0 },
+          "TREATING": { "color": "orange", "index": 1 },
+          "DISCHARGING": { "color": "green", "index": 2 } } } ] }, "overrides": [] },
+      "targets": [ { "refId": "A", "query": "from(bucket: \"telemetry\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"telemetry\" and r._field == \"PLC_state\")" } ]
+    },
+
+    {
+      "id": 1, "type": "timeseries", "title": "Tank level (measured vs predicted)",
+      "datasource": { "type": "influxdb", "uid": "${DS_INFLUXDB}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 18 },
+      "fieldConfig": { "defaults": { "unit": "lengthm", "custom": { "fillOpacity": 10, "lineWidth": 2 } }, "overrides": [] },
+      "targets": [ { "refId": "A", "query": "from(bucket: \"telemetry\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"telemetry\")\n  |> filter(fn: (r) => r._field == \"LIT101_level\" or r._field == \"LIT101_predicted\")" } ]
+    },
+    {
+      "id": 2, "type": "timeseries", "title": "pH (measured vs influent)",
+      "datasource": { "type": "influxdb", "uid": "${DS_INFLUXDB}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 18 },
+      "fieldConfig": { "defaults": { "unit": "none", "min": 2, "max": 9,
+        "custom": { "fillOpacity": 10, "lineWidth": 2, "thresholdsStyle": { "mode": "dashed" } },
+        "thresholds": { "mode": "absolute", "steps": [
+          { "value": null, "color": "red" }, { "value": 6, "color": "green" }, { "value": 8, "color": "red" } ] } }, "overrides": [] },
+      "targets": [ { "refId": "A", "query": "from(bucket: \"telemetry\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"telemetry\")\n  |> filter(fn: (r) => r._field == \"AIT201_ph\" or r._field == \"AIT202_influent_ph\")" } ]
+    },
+    {
+      "id": 3, "type": "timeseries", "title": "Flows (inlet / outlet)",
+      "datasource": { "type": "influxdb", "uid": "${DS_INFLUXDB}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 26 },
+      "fieldConfig": { "defaults": { "unit": "m3/s", "custom": { "fillOpacity": 10, "lineWidth": 2 } }, "overrides": [] },
+      "targets": [ { "refId": "A", "query": "from(bucket: \"telemetry\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"telemetry\")\n  |> filter(fn: (r) => r._field == \"FIT101_inlet_flow\" or r._field == \"FIT102_outlet_flow\")" } ]
+    },
+    {
+      "id": 4, "type": "timeseries", "title": "Dosing output P201 & pump commands",
+      "datasource": { "type": "influxdb", "uid": "${DS_INFLUXDB}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 26 },
+      "fieldConfig": { "defaults": { "custom": { "fillOpacity": 10, "lineWidth": 2 } }, "overrides": [] },
+      "targets": [ { "refId": "A", "query": "from(bucket: \"telemetry\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"telemetry\")\n  |> filter(fn: (r) => r._field == \"P201_dose_cmd\" or r._field == \"P101_inlet_cmd\" or r._field == \"P102_outlet_cmd\")" } ]
+    }
+  ],
+  "templating": {
+    "list": [
+      { "name": "DS_INFLUXDB", "type": "datasource", "query": "influxdb",
+        "current": { "text": "InfluxDB", "value": "InfluxDB" } }
+    ]
+  }
+}

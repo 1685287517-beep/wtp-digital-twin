@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Clearwell Plant — HMI</title>
+<style>
+  :root{
+    --bg:#0a1622; --panel:#0f2233; --line:#2b4a63; --txt:#cfe6f5; --muted:#7fa3bd;
+    --green:#27d07a; --greend:#0e5a36; --red:#ff5b5b; --amber:#ffb020; --blue:#3aa3ff;
+    --pipe:#54748c;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:Consolas,"DejaVu Sans Mono",monospace}
+  .topbar{display:flex;align-items:center;gap:18px;padding:10px 18px;background:linear-gradient(180deg,#10283b,#0b1b29);border-bottom:1px solid var(--line)}
+  .brand{font-weight:bold;letter-spacing:2px;color:#fff;font-size:18px}
+  .tabs{display:flex;gap:8px}
+  .tab{padding:6px 14px;border:1px solid var(--line);border-radius:4px;cursor:pointer;color:var(--muted);font-size:13px;letter-spacing:1px}
+  .tab.active{background:#17405e;color:#fff;border-color:#2f6e9c}
+  .conn{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+  .dot{width:10px;height:10px;border-radius:50%;background:var(--red)}
+  .dot.ok{background:var(--green)}
+  .view{display:none}
+  .view.active{display:block}
+  svg{width:100%;height:auto;display:block}
+  .lbl{fill:var(--muted);font-size:13px;letter-spacing:1px}
+  .lblb{fill:#bcd6ea;font-size:15px;font-weight:bold;letter-spacing:1px}
+  .val{fill:#fff;font-size:18px;font-weight:bold}
+  .box{fill:var(--panel);stroke:var(--line);stroke-width:1.5}
+  .pipe{fill:none;stroke:var(--pipe);stroke-width:9;stroke-linecap:round}
+  .pipe.flow{stroke:var(--blue);stroke-dasharray:10 8;animation:dash .5s linear infinite}
+  @keyframes dash{to{stroke-dashoffset:-18}}
+  .ring{fill:#13283a;stroke:#3a3a3a;stroke-width:4}
+  .pump.run .ring{stroke:var(--green)}
+  .imp{stroke:#9fb6c8;stroke-width:4;fill:none}
+  .pump.run .imp{stroke:#dff5ea}
+  .imp.spin{animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .valve{stroke:#fff;stroke-width:1.5}
+  .valve.open{fill:var(--green)}
+  .valve.closed{fill:var(--red)}
+  .tankwall{fill:#0c1c2b;stroke:#3a6c93;stroke-width:3}
+  .water{fill:#1c74c4;opacity:.85;transition:y .4s linear,height .4s linear}
+  .chem{fill:#2bbf63;stroke:#1d7d44;stroke-width:2}
+  /* control panels (inside foreignObject) */
+  .ctl{font-family:Consolas,monospace;background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:6px;font-size:11px}
+  .ctl-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+  .ctl-h b{color:#dcebf7;letter-spacing:1px;font-size:11px}
+  .st{padding:1px 7px;border-radius:3px;font-weight:bold;font-size:11px;background:#23435c;color:#9fc2da}
+  .st.on{background:var(--greend);color:#7dffb8}
+  .row{display:flex;gap:5px;margin-top:4px}
+  .row button{flex:1;padding:4px 0;border:1px solid var(--line);background:#16334a;color:#b9d4e8;border-radius:3px;cursor:pointer;font-family:inherit;font-size:11px}
+  .row button.sel{background:#2f6e9c;color:#fff;border-color:#4f9fd4}
+  .row button.act{background:#10283b}
+  .row button:disabled{opacity:.35;cursor:not-allowed}
+  /* alarm strip */
+  .alarms{display:flex;gap:14px;flex-wrap:wrap;padding:12px 18px;background:#0b1b29;border-top:1px solid var(--line)}
+  .ind{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);letter-spacing:1px}
+  .ind .led{width:14px;height:14px;border-radius:3px;background:#22384a;border:1px solid #34556e}
+  .ind.on .led{background:var(--red);box-shadow:0 0 8px var(--red)}
+  .ind.warn.on .led{background:var(--amber);box-shadow:0 0 8px var(--amber)}
+  /* alarms tab */
+  .apanel{padding:18px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:normal;letter-spacing:1px}
+  .sev{padding:2px 8px;border-radius:3px;font-weight:bold;font-size:12px}
+  .sev.critical{background:#5a1414;color:#ff9a9a}
+  .sev.warning{background:#5a4012;color:#ffce82}
+  .sev.info{background:#143a5a;color:#9ccbef}
+  .fbtns{margin:6px 0 18px}
+  .fbtns button{margin-right:8px;margin-top:8px;padding:7px 12px;border:1px solid var(--line);background:#16334a;color:#cfe6f5;border-radius:4px;cursor:pointer;font-family:inherit;font-size:12px}
+  iframe{width:100%;height:78vh;border:0;background:#111}
+  h3{color:#bcd6ea;font-weight:normal;letter-spacing:1px}
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">CLEARWELL PLANT</div>
+    <div class="tabs">
+      <div class="tab active" data-v="schematic">SCHEMATIC</div>
+      <div class="tab" data-v="trends">TRENDS</div>
+      <div class="tab" data-v="alarms">ALARMS</div>
+    </div>
+    <div class="conn"><span id="conn-txt">connecting…</span><span class="dot" id="conn-dot"></span></div>
+  </div>
+
+  <!-- ============ SCHEMATIC ============ -->
+  <div class="view active" id="v-schematic">
+  <svg viewBox="0 0 1280 690" xmlns="http://www.w3.org/2000/svg">
+    <!-- inlet -->
+    <text class="lblb" x="30" y="295">INLET</text>
+    <rect class="box" x="30" y="308" width="150" height="48" rx="4"/>
+    <text class="lbl" x="42" y="326">FIT-101</text>
+    <text class="val" x="42" y="346" id="fitIn">0.000</text>
+
+    <path class="pipe" id="pipeIn" d="M150,420 H470"/>
+    <!-- inlet pump P101 -->
+    <g id="P101" class="pump">
+      <circle class="ring" cx="230" cy="420" r="26"/>
+      <g class="imp" style="transform-origin:230px 420px">
+        <path d="M230,420 L230,398 M230,420 L249,431 M230,420 L211,431"/>
+      </g>
+    </g>
+    <text class="lbl" x="206" y="392">P-101</text>
+    <!-- inlet valve V100 -->
+    <g id="V100"><polygon class="valve closed" points="340,404 340,436 360,420"/><polygon class="valve closed" points="380,404 380,436 360,420"/></g>
+    <text class="lbl" x="344" y="396">V-100</text>
+
+    <!-- tank -->
+    <rect class="tankwall" x="470" y="150" width="240" height="400" rx="6"/>
+    <clipPath id="tankclip"><rect x="474" y="154" width="232" height="392" rx="4"/></clipPath>
+    <rect id="water" class="water" x="474" y="546" width="232" height="0" clip-path="url(#tankclip)"/>
+    <text class="lbl" x="496" y="178">CLEARWELL  T-101</text>
+    <text x="590" y="365" id="lvlBig" text-anchor="middle" style="fill:#fff;font-size:34px;font-weight:bold">0.0%</text>
+
+    <!-- dosing: chem tank + doser P201 feeding tank top -->
+    <rect class="chem" x="556" y="30" width="68" height="70" rx="4"/>
+    <text class="lbl" x="556" y="24">CL2-TK</text>
+    <path class="pipe" id="pipeDose" d="M590,100 V150"/>
+    <g id="P201" class="pump">
+      <circle class="ring" cx="590" cy="124" r="17"/>
+      <g class="imp" style="transform-origin:590px 124px">
+        <path d="M590,124 L590,110 M590,124 L602,131 M590,124 L578,131"/>
+      </g>
+    </g>
+
+    <!-- sensors -->
+    <rect class="box" x="744" y="226" width="160" height="50" rx="4"/>
+    <text class="lbl" x="756" y="244">LT-101</text><text class="val" x="756" y="265" id="LT">0.00 m</text>
+    <rect class="box" x="744" y="300" width="160" height="50" rx="4"/>
+    <text class="lbl" x="756" y="318">AIT-201 pH</text><text class="val" x="756" y="339" id="pH">7.00</text>
+    <rect class="box" x="744" y="374" width="160" height="50" rx="4"/>
+    <text class="lbl" x="756" y="392">AIT-202 INFL pH</text><text class="val" x="756" y="413" id="influent">5.80</text>
+
+    <!-- outlet -->
+    <path class="pipe" id="pipeOut" d="M710,500 H1130"/>
+    <g id="P102" class="pump">
+      <circle class="ring" cx="820" cy="500" r="26"/>
+      <g class="imp" style="transform-origin:820px 500px">
+        <path d="M820,500 L820,478 M820,500 L839,511 M820,500 L801,511"/>
+      </g>
+    </g>
+    <text class="lbl" x="796" y="472">P-102</text>
+    <g id="V101"><polygon class="valve closed" points="960,484 960,516 980,500"/><polygon class="valve closed" points="1000,484 1000,516 980,500"/></g>
+    <text class="lbl" x="964" y="476">V-101</text>
+    <text class="lblb" x="1095" y="478">OUTLET</text>
+    <rect class="box" x="1095" y="490" width="150" height="48" rx="4"/>
+    <text class="lbl" x="1107" y="508">FIT-102</text><text class="val" x="1107" y="528" id="fitOut">0.000</text>
+
+    <!-- control panels -->
+    <foreignObject x="120" y="452" width="200" height="96"><div xmlns="http://www.w3.org/1999/xhtml" class="ctl" data-dev="P101" data-kind="pump">
+      <div class="ctl-h"><b>P-101 INLET PUMP</b><span class="st" data-st>STOP</span></div>
+      <div class="row"><button data-mode="AUTO">AUTO</button><button data-mode="MAN">MAN</button></div>
+      <div class="row"><button class="act" data-cmd="start">START</button><button class="act" data-cmd="stop">STOP</button></div>
+    </div></foreignObject>
+
+    <foreignObject x="332" y="452" width="190" height="96"><div xmlns="http://www.w3.org/1999/xhtml" class="ctl" data-dev="V100" data-kind="valve">
+      <div class="ctl-h"><b>V-100 INLET</b><span class="st" data-st>CLOSED</span></div>
+      <div class="row"><button data-mode="AUTO">AUTO</button><button data-mode="MAN">MAN</button></div>
+      <div class="row"><button class="act" data-cmd="open">OPEN</button><button class="act" data-cmd="close">CLOSE</button></div>
+    </div></foreignObject>
+
+    <foreignObject x="648" y="36" width="200" height="96"><div xmlns="http://www.w3.org/1999/xhtml" class="ctl" data-dev="P201" data-kind="pump">
+      <div class="ctl-h"><b>P-201 DOSER</b><span class="st" data-st>STOP</span></div>
+      <div class="row"><button data-mode="AUTO">AUTO</button><button data-mode="MAN">MAN</button></div>
+      <div class="row"><button class="act" data-cmd="start">START</button><button class="act" data-cmd="stop">STOP</button></div>
+    </div></foreignObject>
+
+    <foreignObject x="740" y="540" width="200" height="96"><div xmlns="http://www.w3.org/1999/xhtml" class="ctl" data-dev="P102" data-kind="pump">
+      <div class="ctl-h"><b>P-102 OUTLET PUMP</b><span class="st" data-st>STOP</span></div>
+      <div class="row"><button data-mode="AUTO">AUTO</button><button data-mode="MAN">MAN</button></div>
+      <div class="row"><button class="act" data-cmd="start">START</button><button class="act" data-cmd="stop">STOP</button></div>
+    </div></foreignObject>
+
+    <foreignObject x="952" y="540" width="190" height="96"><div xmlns="http://www.w3.org/1999/xhtml" class="ctl" data-dev="V101" data-kind="valve">
+      <div class="ctl-h"><b>V-101 OUTLET</b><span class="st" data-st>CLOSED</span></div>
+      <div class="row"><button data-mode="AUTO">AUTO</button><button data-mode="MAN">MAN</button></div>
+      <div class="row"><button class="act" data-cmd="open">OPEN</button><button class="act" data-cmd="close">CLOSE</button></div>
+    </div></foreignObject>
+  </svg>
+
+  <div class="alarms">
+    <div class="ind" id="al-LL"><span class="led"></span>LEVEL LL</div>
+    <div class="ind warn" id="al-L"><span class="led"></span>LEVEL L</div>
+    <div class="ind warn" id="al-H"><span class="led"></span>LEVEL H</div>
+    <div class="ind" id="al-HH"><span class="led"></span>LEVEL HH</div>
+    <div class="ind" id="al-PHL"><span class="led"></span>pH LOW</div>
+    <div class="ind" id="al-PHH"><span class="led"></span>pH HIGH</div>
+    <div class="ind" id="al-ST"><span class="led"></span>DATA STALE</div>
+  </div>
+  </div>
+
+  <!-- ============ TRENDS ============ -->
+  <div class="view" id="v-trends">
+    <iframe src="http://localhost:3000/d/wtp-live?orgId=1&kiosk" title="Trends"></iframe>
+  </div>
+
+  <!-- ============ ALARMS ============ -->
+  <div class="view" id="v-alarms">
+    <div class="apanel">
+      <h3>Inject / clear faults (operator panel)</h3>
+      <div class="fbtns" id="fbtns"></div>
+      <h3>AI assistant — recent recommendations</h3>
+      <table><thead><tr><th style="width:120px">Severity</th><th style="width:220px">Fault</th><th>Recommendation</th></tr></thead>
+      <tbody id="alist"><tr><td colspan="3" style="color:var(--muted)">No alarms yet.</td></tr></tbody></table>
+    </div>
+  </div>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+async function post(u,b){try{await fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});}catch(e){}}
+
+// tabs
+$$('.tab').forEach(t=>t.onclick=()=>{
+  $$('.tab').forEach(x=>x.classList.remove('active')); t.classList.add('active');
+  $$('.view').forEach(v=>v.classList.remove('active')); $('#v-'+t.dataset.v).classList.add('active');
+});
+
+// wire control buttons
+$$('.ctl').forEach(c=>{
+  const dev=c.dataset.dev;
+  c.querySelectorAll('button[data-mode]').forEach(b=>b.onclick=()=>post('/api/control',{device:dev,mode:b.dataset.mode}));
+  c.querySelectorAll('button[data-cmd]').forEach(b=>b.onclick=()=>post('/api/control',{device:dev,cmd:b.dataset.cmd}));
+});
+
+// fault buttons
+const FAULTS=[['SENSOR_LEVEL_STUCK','Sensor: level stuck'],['EQUIP_PUMP_NO_FLOW','Equip: pump no flow'],
+              ['PROCESS_PH_EXCURSION','Process: pH excursion'],['INFRA_MQTT_STALE','Infra: data stale']];
+const fb=$('#fbtns');
+FAULTS.forEach(([k,lbl])=>{
+  const on=document.createElement('button'); on.textContent='▶ '+lbl; on.onclick=()=>post('/api/fault',{fault:k,active:true});
+  const off=document.createElement('button'); off.textContent='■ clear'; off.style.opacity=.7; off.onclick=()=>post('/api/fault',{fault:k,active:false});
+  fb.appendChild(on); fb.appendChild(off);
+});
+
+const num=(v,d=3)=>(v==null?'—':Number(v).toFixed(d));
+function pump(id,on){const g=$('#'+id);g.classList.toggle('run',!!on);g.querySelector('.imp').classList.toggle('spin',!!on);}
+function valve(id,open){$$('#'+id+' polygon').forEach(p=>{p.classList.toggle('open',!!open);p.classList.toggle('closed',!open);});}
+function flow(id,on){$('#'+id).classList.toggle('flow',!!on);}
+function setText(id,t){const e=$('#'+id);if(e)e.textContent=t;}
+function ind(id,on,cls){const e=$('#'+id);if(e)e.classList.toggle('on',!!on);}
+
+function ctl(dev,statusText,statusOn,mode,actEnabled){
+  const c=$('.ctl[data-dev="'+dev+'"]'); if(!c)return;
+  const st=c.querySelector('[data-st]'); st.textContent=statusText; st.classList.toggle('on',!!statusOn);
+  c.querySelectorAll('button[data-mode]').forEach(b=>b.classList.toggle('sel',b.dataset.mode===mode));
+  c.querySelectorAll('button[data-cmd]').forEach(b=>b.disabled=(mode!=='MAN'));
+}
+
+async function tick(){
+  let s; try{s=await (await fetch('/api/state')).json();}catch(e){return;}
+  const t=s.tags||{};
+  const fresh=(Date.now()/1000-(s.ts||0))<3;
+  $('#conn-dot').classList.toggle('ok',fresh);
+  $('#conn-txt').textContent=fresh?'CONNECTED':'NO DATA';
+
+  // tank water
+  const pct=Math.max(0,Math.min(100,t.LIT101_level_pct??0));
+  const innerTop=154, innerBot=546, innerH=innerBot-innerTop;
+  const h=innerH*pct/100; const w=$('#water'); w.setAttribute('height',h); w.setAttribute('y',innerBot-h);
+  setText('lvlBig',pct.toFixed(1)+'%');
+  setText('LT',num(t.LIT101_level,2)+' m');
+  setText('influent',num(t.AIT202_influent_ph,2));
+  setText('fitIn',num(t.FIT101_inlet_flow,3));
+  setText('fitOut',num(t.FIT102_outlet_flow,3));
+
+  const ph=t.AIT201_ph; setText('pH',num(ph,2));
+  const phbox=$('#pH'); if(ph!=null) phbox.style.fill=(ph<6||ph>8)?'#ff7a7a':'#6dffb0';
+
+  pump('P101',t.P101_inlet_cmd); pump('P102',t.P102_outlet_cmd); pump('P201',(t.P201_dose_cmd??0)>0.01);
+  valve('V100',t.V100_inlet_open); valve('V101',t.V101_outlet_open);
+  flow('pipeIn',(t.FIT101_inlet_flow??0)>0); flow('pipeOut',(t.FIT102_outlet_flow??0)>0); flow('pipeDose',(t.P201_dose_cmd??0)>0.01);
+
+  ctl('P101', t.P101_inlet_cmd?'RUN':'STOP', t.P101_inlet_cmd, t.P101_mode);
+  ctl('P102', t.P102_outlet_cmd?'RUN':'STOP', t.P102_outlet_cmd, t.P102_mode);
+  ctl('V100', t.V100_inlet_open?'OPEN':'CLOSED', t.V100_inlet_open, t.V100_mode);
+  ctl('V101', t.V101_outlet_open?'OPEN':'CLOSED', t.V101_outlet_open, t.V101_mode);
+  const dpct=Math.round((t.P201_dose_cmd??0)*100);
+  ctl('P201', dpct>0?('RUN '+dpct+'%'):'STOP', dpct>0, t.P201_mode);
+
+  ind('al-LL',pct<10); ind('al-L',pct<20); ind('al-H',pct>90); ind('al-HH',pct>95);
+  ind('al-PHL',ph!=null&&ph<6); ind('al-PHH',ph!=null&&ph>8); ind('al-ST',!fresh);
+
+  // alarms list
+  const tb=$('#alist'); const a=s.alarms||[];
+  if(a.length){
+    tb.innerHTML=a.map(x=>`<tr><td><span class="sev ${x.severity||'info'}">${(x.severity||'info').toUpperCase()}</span></td>
+      <td>${x.fault||''}</td><td>${x.diagnosis||''}${x.actions&&x.actions.length?'<br>• '+x.actions.join('<br>• '):''}</td></tr>`).join('');
+  }
+}
+setInterval(tick,500); tick();
+</script>
+</body>
+</html>

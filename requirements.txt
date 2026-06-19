@@ -1,0 +1,5 @@
+paho-mqtt>=2.0
+influxdb-client>=1.40
+anthropic>=0.40
+fastapi>=0.110
+uvicorn[standard]>=0.29
