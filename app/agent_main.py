@@ -63,6 +63,9 @@ def main():
                 announce(f, details.get(f, ""))
             for f in cleared:
                 print(f"[AGENT] cleared: {f}", flush=True)
+                # tell downstream (e.g. cloud bridge) the fault is gone
+                publish_json(client, TOPIC_AGENT,
+                             {"ts": time.time(), "fault": f, "cleared": True})
             active_faults.clear()
             active_faults.update(found)
 

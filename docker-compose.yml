@@ -69,6 +69,17 @@ services:
     depends_on:
       - mosquitto
 
+  tb_bridge:
+    build: .
+    command: python -m app.tb_bridge
+    environment:
+      MQTT_HOST: mosquitto
+      # put your ThingsBoard Cloud device token in .env to enable cloud forwarding
+      TB_TOKEN: ${TB_TOKEN:-}
+      TB_HOST: ${TB_HOST:-thingsboard.cloud}
+    depends_on:
+      - mosquitto
+
   hmi:
     build: .
     command: uvicorn app.hmi:app --host 0.0.0.0 --port 8090

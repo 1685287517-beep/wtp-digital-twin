@@ -59,6 +59,9 @@
   .ind .led{width:14px;height:14px;border-radius:3px;background:#22384a;border:1px solid #34556e}
   .ind.on .led{background:var(--red);box-shadow:0 0 8px var(--red)}
   .ind.warn.on .led{background:var(--amber);box-shadow:0 0 8px var(--amber)}
+  .ackbtn{margin-left:auto;padding:8px 16px;border:1px solid #5a3a3a;background:#241616;color:#ffb0b0;border-radius:5px;cursor:pointer;font-family:inherit;font-size:13px;letter-spacing:1px}
+  .ackbtn.active{background:var(--red);color:#fff;border-color:#ff8a8a;animation:blink 1s steps(2,jump-none) infinite}
+  @keyframes blink{50%{opacity:.45}}
   /* alarms tab */
   .apanel{padding:18px}
   table{width:100%;border-collapse:collapse;font-size:13px}
@@ -188,6 +191,7 @@
     <div class="ind" id="al-PHL"><span class="led"></span>pH LOW</div>
     <div class="ind" id="al-PHH"><span class="led"></span>pH HIGH</div>
     <div class="ind" id="al-ST"><span class="led"></span>DATA STALE</div>
+    <button id="ackBtn" class="ackbtn">&#128276; ACK / SILENCE</button>
   </div>
   </div>
 
@@ -279,8 +283,12 @@ async function tick(){
   const dpct=Math.round((t.P201_dose_cmd??0)*100);
   ctl('P201', dpct>0?('RUN '+dpct+'%'):'STOP', dpct>0, t.P201_mode);
 
-  ind('al-LL',pct<10); ind('al-L',pct<20); ind('al-H',pct>90); ind('al-HH',pct>95);
+  // thresholds chosen so normal operation (level 20-80%) stays quiet
+  const phEx = ph!=null&&(ph<6||ph>8);
+  ind('al-LL',pct<8); ind('al-L',pct<15); ind('al-H',pct>88); ind('al-HH',pct>96);
   ind('al-PHL',ph!=null&&ph<6); ind('al-PHH',ph!=null&&ph>8); ind('al-ST',!fresh);
+  // sound the horn only for serious alarms (LL/HH, pH excursion, data loss)
+  updateHorn(pct<8 || pct>96 || phEx || !fresh);
 
   // alarms list
   const tb=$('#alist'); const a=s.alarms||[];
@@ -289,6 +297,29 @@ async function tick(){
       <td>${x.fault||''}</td><td>${x.diagnosis||''}${x.actions&&x.actions.length?'<br>• '+x.actions.join('<br>• '):''}</td></tr>`).join('');
   }
 }
+// ---- audible alarm horn (Web Audio, no files needed) ----
+let audioCtx=null;
+function enableAudio(){try{if(!audioCtx)audioCtx=new (window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==='suspended')audioCtx.resume();}catch(e){}}
+window.addEventListener('click',enableAudio);      // browsers need a user gesture before sound
+function beep(){
+  if(!audioCtx)return;
+  const o=audioCtx.createOscillator(),g=audioCtx.createGain(),t=audioCtx.currentTime;
+  o.type='square'; o.frequency.value=820; o.connect(g); g.connect(audioCtx.destination);
+  g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.2,t+0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+0.3); o.start(t); o.stop(t+0.32);
+}
+let prevAlarm=false, silenced=false, hornTimer=null;
+function updateHorn(active){
+  const btn=$('#ackBtn');
+  if(active && !prevAlarm) silenced=false;   // a NEW alarm re-arms the horn
+  prevAlarm=active;
+  const sounding=active && !silenced;
+  if(btn){btn.classList.toggle('active',sounding); btn.textContent=(active&&silenced)?'\u{1F515} SILENCED':'\u{1F514} ACK / SILENCE';}
+  if(sounding && !hornTimer){beep(); hornTimer=setInterval(beep,1400);}
+  else if(!sounding && hornTimer){clearInterval(hornTimer); hornTimer=null;}
+}
+$('#ackBtn').onclick=()=>{enableAudio(); silenced=true; updateHorn(prevAlarm);};
+
 setInterval(tick,500); tick();
 </script>
 </body>

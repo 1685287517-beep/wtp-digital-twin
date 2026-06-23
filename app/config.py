@@ -25,6 +25,12 @@ INFLUX_BUCKET = os.getenv("INFLUX_BUCKET", "telemetry")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 AGENT_MODEL = os.getenv("AGENT_MODEL", "claude-sonnet-4-6")
 
+# ---- ThingsBoard Cloud (optional cloud platform) ---------------------------
+TB_HOST   = os.getenv("TB_HOST", "mqtt.thingsboard.cloud")
+TB_PORT   = int(os.getenv("TB_PORT", "1883"))
+TB_TOKEN  = os.getenv("TB_TOKEN", "")            # device access token (empty = bridge idles)
+TB_PERIOD = float(os.getenv("TB_PERIOD", "2.0")) # forward at most every N s (free-tier friendly)
+
 # ---- process setpoints (also used by the PLC) -------------------------------
 LEVEL_LOW_SP  = 1.0     # m  - start filling below this
 LEVEL_HIGH_SP = 4.0     # m  - stop filling above this
