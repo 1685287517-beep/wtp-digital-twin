@@ -24,11 +24,11 @@ Rules:
 - Prefer safe, reversible actions; escalate to a human for anything risky.
 - Be concise: an operator reads this under stress.
 
-Respond as strict JSON:
+Respond as strict JSON (keep it compact — at most 5 short action steps, each one line):
 {"severity": "info|warning|critical",
  "diagnosis": "one or two sentences",
  "actions": ["step 1", "step 2", ...],
- "reasoning": "why, referencing the tags"}"""
+ "reasoning": "why, referencing the specific tag values you were given"}"""
 
 # Built-in fallback playbook (used when the LLM is unavailable).
 PLAYBOOK = {
@@ -79,7 +79,7 @@ def recommend(fault: str, detail: str, snapshot: dict) -> dict:
                     f"Recent tag snapshot:\n{json.dumps(snapshot, indent=2)}")
             msg = client.messages.create(
                 model=AGENT_MODEL,
-                max_tokens=600,
+                max_tokens=1500,   # large enough that the JSON reply is never truncated
                 system=SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": user}],
             )
