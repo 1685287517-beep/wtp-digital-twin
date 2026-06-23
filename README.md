@@ -1,60 +1,58 @@
 # Water Treatment Plant — Digital Twin
 
-Group assignment for **TUMA206 Modern Developments in Industry**. A working
-digital twin of a water-treatment tank, instrumented through a full industrial
-stack — field → PLC → MQTT → historian → dashboard — with an agentic AI
-assistant that detects faults and recommends operator actions in plain language.
+Group assignment for **TUMA206 Modern Developments in Industry** (group 03). A
+working digital twin of a clearwell / water-treatment tank, instrumented through
+a full industrial stack — field → PLC → MQTT → historian → dashboards — with an
+**agentic AI assistant** (Claude) that detects faults and recommends operator
+actions in plain language, surfaced through **three alarm channels**: an animated
+SCADA HMI, a ThingsBoard Cloud dashboard, and Telegram push notifications.
 
+> ⚠️ **Viva note (AI use policy §8):** every team member must be able to explain
+> any line of this code. See [`docs/系统原理.md`](docs/系统原理.md) for a plain-language
+> walkthrough of how it all works.
 
 ## Architecture
 
 ```
- ┌─────────────┐   sensors   ┌──────────┐  commands
- │ ProcessModel│────────────▶│   PLC    │───────────┐
- │ (the twin)  │◀────────────│ on/off + │           │
- │ tank·pumps· │  actuators  │ PID +    │           │
- │ valve·pH    │             │ state m. │           │
- └─────────────┘             └──────────┘           │
-        ▲ fault hooks              │ tag map         │
-        │                          ▼                 │
-        │                  ┌───────────────┐         │
-   inject_fault ──────────▶│  sim_main     │  publish JSON
-   (operator panel)        │  loop         │────────────────┐
-                           └───────────────┘                ▼
-                                                     ┌───────────────┐
-                                                     │   MQTT broker │  plant/wtp/area1/telemetry
-                                                     │  (Mosquitto)  │
-                                                     └───────────────┘
-                                              ┌───────────┴───────────┐
-                                              ▼                       ▼
-                                      ┌───────────────┐       ┌───────────────┐
-                                      │  historian    │       │  agent_main   │
-                                      │ MQTT→InfluxDB │       │ detect→Claude │
-                                      └───────┬───────┘       └───────┬───────┘
-                                              ▼                       │ publish advice
-                                      ┌───────────────┐               │
-                                      │   InfluxDB    │◀──────────────┘
-                                      └───────┬───────┘   (agent_events)
-                                              ▼
-                                      ┌───────────────┐
-                                      │   Grafana     │  live trends + alarms
-                                      └───────────────┘
+                          ┌──────────────┐  sensors  ┌──────────────┐
+   operator (HMI/CLI) ───▶│ Digital twin │──────────▶│   Soft PLC   │
+   fault injection        │ tank·pumps·  │◀──────────│ on/off · PID │
+   device control         │ valves·pH    │  commands │ state machine│
+                          └──────────────┘           └──────┬───────┘
+                                                            │ publish tags (JSON)
+                                                            ▼
+                                            ┌───────────────────────────┐
+                                            │   MQTT broker (Mosquitto)  │
+                                            └───────────────┬───────────┘
+        ┌───────────────┬───────────────────┬──────────────┼───────────────┐
+        ▼               ▼                   ▼              ▼                ▼
+ ┌────────────┐  ┌────────────┐     ┌──────────────┐ ┌───────────┐  ┌──────────────┐
+ │ historian  │  │  AI agent  │     │  SCADA HMI   │ │ tb_bridge │  │  telegram    │
+ │ →InfluxDB  │  │ detect →   │     │ (FastAPI +   │ │ → Things- │  │  notifier    │
+ │            │  │ Claude     │     │ animated SVG)│ │ Board     │  │  (phone push)│
+ └─────┬──────┘  └─────┬──────┘     │ + controls + │ │ Cloud ☁️  │  └──────────────┘
+       ▼               │ advice     │ sound alarm  │ └───────────┘
+   ┌─────────┐         │            └──────────────┘
+   │ Grafana │◀────────┘ (agent_events)
+   └─────────┘
 ```
+
+Everything is decoupled through MQTT: adding a new consumer (cloud bridge,
+Telegram, a second dashboard) needs **no change** to any existing service.
 
 ## Stack & justification (LO6)
 
 | Layer | Choice | Why |
 |-------|--------|-----|
-| Process + PLC | Python (single deterministic scan loop) | Transparent, easy to reason about and defend in the viva; PID/state-machine logic is plain code. |
-| Messaging | **MQTT** (Eclipse Mosquitto) | Lightweight pub/sub, the de-facto IIoT transport; decouples field from upstream services. |
-| Historian | **InfluxDB 2.7** | Purpose-built time-series DB; native Grafana integration; retention/downsampling out of the box. |
-| Dashboard | **Grafana** | No frontend code; provisioned trends + alarm thresholds. |
-| AI assistant | **Claude** (`claude-sonnet-4-6`), via Anthropic SDK | Strong agentic reasoning; produces safe, *explained* recommendations. Falls back to a built-in playbook offline so the demo never fails. |
-| Orchestration | **docker-compose** | One command brings up the entire stack = reproducible demo. |
-
-Trade-offs we accept: a first-order physics model (not CFD) — enough to make
-control and faults realistic; MQTT over OPC-UA — simpler, though OPC-UA carries
-richer typed metadata; InfluxDB over a plain SQL store — better fit for tags.
+| Process + PLC | Python (single deterministic scan loop) | Transparent control logic; easy to defend in the viva. |
+| Messaging | **MQTT** (Eclipse Mosquitto) | Lightweight pub/sub; de-facto IIoT transport; decouples field from IT. |
+| Historian | **InfluxDB 2.7** | Purpose-built time-series DB; native Grafana integration. |
+| Dashboard | **Grafana** | Provisioned trends, KPI row, P&ID canvas, alarm table. |
+| Operator HMI | **FastAPI + animated SVG** | Real SCADA mimic with AUTO/MAN device control + audible alarm. |
+| AI assistant | **Claude** (`claude-sonnet-4-6`) | Live reasoning over the data snapshot; safe, explained advice; offline playbook fallback. |
+| Cloud platform | **ThingsBoard Cloud** | Hosted IoT platform: cloud dashboard + rule-engine alarms. |
+| Notifications | **Telegram bot** | Pushes alarms (with AI advice) to an operator's phone. |
+| Orchestration | **docker-compose** | One command brings up the whole stack. |
 
 ## Repository layout
 
@@ -66,88 +64,83 @@ app/
   plc.py             PID, on/off, state machine, scan cycle
   faults.py          fault-injection manager (4 layers)
   bus.py             MQTT helpers
-  sim_main.py        ► run twin + PLC, publish telemetry
+  sim_main.py        ► twin + PLC + operator overrides, publish telemetry
   historian.py       ► MQTT -> InfluxDB
-  agent_detector.py  deterministic rule-based detection
+  agent_detector.py  deterministic rule-based fault detection
   agent_assistant.py Claude-backed recommendations (+ offline playbook)
-  agent_main.py      ► detect, recommend, publish advice
-  inject_fault.py    operator panel CLI
+  agent_main.py      ► detect, recommend (async), publish advice
+  hmi.py             ► FastAPI HMI backend (state + control API)
+  static/index.html  animated SCADA mimic (controls + sound alarm)
+  tb_bridge.py       ► forward telemetry + AI alarms to ThingsBoard Cloud
+  telegram_notify.py ► push alarms to Telegram
+  inject_fault.py    operator CLI for fault injection
+  demo_local.py      headless end-to-end demo (no broker/DB needed)
 faults/catalog.md    the four chosen faults + detection methods
-docs/                tag dictionary (+ generator)
+docs/                tag dictionary, deck, system explainer
 grafana/             provisioned datasource + dashboard
 docker-compose.yml   the whole stack
 ```
 
 ## Run it
 
-### Quickest: headless end-to-end (no broker, DB or Docker)
-
-Proves the whole pipeline — twin → PLC → detection → AI advice — in one process,
-injecting all four faults in sequence. Great first run, and a fallback if Docker
-misbehaves on demo day. Needs no pip installs beyond the standard library.
+### Everything in Docker (recommended)
 
 ```bash
-python -m app.demo_local        # ~8 s per fault
-python -m app.demo_local 5      # hold each fault 5 s
-```
-
-### Everything in Docker (recommended for the demo)
-
-```bash
-cp .env.example .env          # optional: add ANTHROPIC_API_KEY for the real LLM
+cp .env.example .env     # add ANTHROPIC_API_KEY (live AI), TB_TOKEN (cloud), TG_* (Telegram)
 docker compose up --build
 ```
 
-- Grafana: http://localhost:3000  (anonymous admin; dashboard "Water Treatment Plant — Live")
-- InfluxDB: http://localhost:8086  (admin / admin12345)
+- **SCADA HMI**: http://localhost:8090  ← the main operator screen
+- **Grafana**: http://localhost:3000/d/wtp-live
+- **InfluxDB**: http://localhost:8086  (admin / admin12345)
 
-Watch the AI assistant's output:
-
-```bash
-docker compose logs -f agent
-```
-
-Inject faults from another terminal:
+Inject faults from the HMI **ALARMS** tab, or the CLI:
 
 ```bash
-docker compose run --rm agent python -m app.inject_fault EQUIP_PUMP_NO_FLOW on
-docker compose run --rm agent python -m app.inject_fault EQUIP_PUMP_NO_FLOW off
+docker compose exec agent python -m app.inject_fault PROCESS_PH_EXCURSION on
+docker compose exec agent python -m app.inject_fault PROCESS_PH_EXCURSION off
 ```
 
-### Locally without Docker (for development)
+### Quickest: headless demo (no broker, DB or Docker)
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-# you need an MQTT broker + InfluxDB running; then in separate shells:
-python -m app.sim_main
-python -m app.historian
-python -m app.agent_main
-python -m app.inject_fault list
+python -m app.demo_local        # runs twin+PLC+detection+AI, injects all 4 faults
 ```
 
-## The four faults
+## The four faults (LO4)
 
-See [`faults/catalog.md`](faults/catalog.md). Summary: `SENSOR_LEVEL_STUCK`,
-`EQUIP_PUMP_NO_FLOW`, `PROCESS_PH_EXCURSION`, `INFRA_MQTT_STALE` — each detected
-within the 60 s window and answered by the AI assistant.
-
-## Tag dictionary
-
-See [`docs/tag_dictionary.md`](docs/tag_dictionary.md) (regenerate with
-`python docs/gen_tag_dictionary.py`).
+See [`faults/catalog.md`](faults/catalog.md). One per Purdue layer:
+`SENSOR_LEVEL_STUCK`, `EQUIP_PUMP_NO_FLOW`, `PROCESS_PH_EXCURSION`,
+`INFRA_MQTT_STALE` — each detected within 60 s and answered by the AI assistant.
 
 ## AI assistant design (LO5)
 
 - **Detect first, deterministically.** `agent_detector.py` raises faults from
-  sensor cross-checks and trends — fast and explainable, independent of the LLM.
-- **Then advise, with reasoning.** On a *new* fault the assistant gets the fault
-  and a recent tag snapshot and returns `{severity, diagnosis, actions,
-  reasoning}` as JSON.
-- **Safety:** the agent **advises only**, never actuates; a human operator
-  decides. It must ground claims in the data it was shown.
-- **Graceful degradation:** no API key / no network → built-in playbook, so the
-  live demo always produces a recommendation.
+  sensor cross-checks and trends — fast, explainable, independent of the LLM, so
+  the ≤60 s requirement holds even if the model is slow.
+- **Then advise, with reasoning.** Claude receives the fault + a live tag
+  snapshot and returns `{severity, diagnosis, actions, reasoning}` — grounding
+  its advice in the actual current values (it will even flag inconsistent
+  readings, e.g. a flow of 0 while the pump runs and level rises).
+- **Non-blocking + resilient.** The LLM call runs in a background thread with a
+  timeout; on any failure it falls back to a built-in playbook, so the demo
+  always produces a recommendation.
+- **Safety:** the agent **advises only**, never actuates; a human decides.
+
+## Alarm channels
+
+| Channel | What it shows |
+|---------|---------------|
+| **SCADA HMI** | Red LEDs + audible horn + ACK/Silence; AI advice list with timestamps. |
+| **ThingsBoard Cloud** | Rule-engine alarm (`AI Detected Fault`) + telemetry incl. `fault_recommendation`. |
+| **Telegram** | Phone push with the fault, Claude's diagnosis and recommended actions. |
+
+## Cloud & notifications setup
+
+- **ThingsBoard**: create a device, set `TB_TOKEN` in `.env`; `tb_bridge`
+  forwards telemetry + AI faults. A device **Alarm rule** (`fault_active equal 1`)
+  turns them into cloud alarms.
+- **Telegram**: create a bot with @BotFather, set `TG_BOT_TOKEN` and `TG_CHAT_ID`.
 
 ## Team
 
@@ -155,6 +148,6 @@ See [`docs/tag_dictionary.md`](docs/tag_dictionary.md) (regenerate with
 |------|---------------|--------|-------------------|
 | _TODO_ | | | Process model + PLC |
 | _TODO_ | | | MQTT + historian + Grafana |
-| _TODO_ | | | AI agent |
-| _TODO_ | | | Fault injection + integration |
-| _TODO_ | | | Docs + presentation |
+| _TODO_ | | | AI agent + HMI |
+| _TODO_ | | | Cloud (ThingsBoard) + Telegram |
+| _TODO_ | | | Fault injection + docs + presentation |
