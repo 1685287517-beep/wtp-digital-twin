@@ -80,6 +80,17 @@ services:
     depends_on:
       - mosquitto
 
+  telegram:
+    build: .
+    command: python -m app.telegram_notify
+    environment:
+      MQTT_HOST: mosquitto
+      # set these in .env to enable phone alarms via a Telegram bot
+      TG_BOT_TOKEN: ${TG_BOT_TOKEN:-}
+      TG_CHAT_ID: ${TG_CHAT_ID:-}
+    depends_on:
+      - mosquitto
+
   hmi:
     build: .
     command: uvicorn app.hmi:app --host 0.0.0.0 --port 8090

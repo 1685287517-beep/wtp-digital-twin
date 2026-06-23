@@ -31,6 +31,10 @@ TB_PORT   = int(os.getenv("TB_PORT", "1883"))
 TB_TOKEN  = os.getenv("TB_TOKEN", "")            # device access token (empty = bridge idles)
 TB_PERIOD = float(os.getenv("TB_PERIOD", "2.0")) # forward at most every N s (free-tier friendly)
 
+# ---- Telegram alarm notifications (optional) -------------------------------
+TG_BOT_TOKEN = os.getenv("TG_BOT_TOKEN", "")     # from @BotFather (empty = notifier idles)
+TG_CHAT_ID   = os.getenv("TG_CHAT_ID", "")       # your chat or group id
+
 # ---- process setpoints (also used by the PLC) -------------------------------
 LEVEL_LOW_SP  = 1.0     # m  - start filling below this
 LEVEL_HIGH_SP = 4.0     # m  - stop filling above this
