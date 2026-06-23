@@ -38,7 +38,8 @@ def _on_message(_c, _u, msg):
         if msg.topic == TOPIC_TELEMETRY:
             with _lock:
                 _state = payload
-        elif msg.topic == TOPIC_AGENT:
+        elif msg.topic == TOPIC_AGENT and not payload.get("cleared"):
+            # 'cleared' events are for the cloud bridge, not the operator list
             with _lock:
                 _alarms.insert(0, payload)
                 del _alarms[30:]
@@ -66,6 +67,13 @@ def state():
     with _lock:
         return {"tags": _state.get("tags", {}), "ts": _state.get("ts", 0),
                 "alarms": list(_alarms)}
+
+
+@app.post("/api/alarms/clear")
+def clear_alarms():
+    with _lock:
+        _alarms.clear()
+    return {"ok": True}
 
 
 @app.post("/api/control")

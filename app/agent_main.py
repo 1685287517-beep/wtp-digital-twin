@@ -29,8 +29,8 @@ def main():
 
     client = make_client("wtp-agent")
 
-    def announce(fault, detail):
-        rec = recommend(fault, detail, last_snapshot)
+    def announce(fault, detail, snapshot):
+        rec = recommend(fault, detail, snapshot)
         out = {
             "ts": time.time(),
             "fault": fault,
@@ -54,20 +54,28 @@ def main():
         print("=" * 70, flush=True)
 
     def evaluate_and_announce():
+        # snapshot under the lock, then do detection + LLM OUTSIDE the lock so a
+        # slow Claude call can never freeze telemetry processing
         with lock:
-            found = {f for f, _ in detector.evaluate(last_snapshot)}
-            details = {f: d for f, d in detector.evaluate(last_snapshot)}
+            snap = dict(last_snapshot)
+        if not snap:
+            return
+        results = detector.evaluate(snap)
+        found = {f for f, _ in results}
+        details = {f: d for f, d in results}
+        with lock:
             new = found - active_faults
             cleared = active_faults - found
-            for f in new:
-                announce(f, details.get(f, ""))
-            for f in cleared:
-                print(f"[AGENT] cleared: {f}", flush=True)
-                # tell downstream (e.g. cloud bridge) the fault is gone
-                publish_json(client, TOPIC_AGENT,
-                             {"ts": time.time(), "fault": f, "cleared": True})
             active_faults.clear()
             active_faults.update(found)
+        # each new fault gets its recommendation in a background thread, so the
+        # LLM call (even if slow) never blocks the detection loop
+        for f in new:
+            threading.Thread(target=announce, args=(f, details.get(f, ""), snap),
+                             daemon=True).start()
+        for f in cleared:
+            print(f"[AGENT] cleared: {f}", flush=True)
+            publish_json(client, TOPIC_AGENT, {"ts": time.time(), "fault": f, "cleared": True})
 
     def on_message(_c, _u, msg):
         nonlocal last_snapshot

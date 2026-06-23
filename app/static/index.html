@@ -73,6 +73,8 @@
   .sev.info{background:#143a5a;color:#9ccbef}
   .fbtns{margin:6px 0 18px}
   .fbtns button{margin-right:8px;margin-top:8px;padding:7px 12px;border:1px solid var(--line);background:#16334a;color:#cfe6f5;border-radius:4px;cursor:pointer;font-family:inherit;font-size:12px}
+  .clrbtn{padding:6px 12px;border:1px solid var(--line);background:#16334a;color:#cfe6f5;border-radius:4px;cursor:pointer;font-family:inherit;font-size:12px}
+  .clrbtn:hover{background:#1d4263}
   iframe{width:100%;height:78vh;border:0;background:#111}
   h3{color:#bcd6ea;font-weight:normal;letter-spacing:1px}
 </style>
@@ -205,9 +207,12 @@
     <div class="apanel">
       <h3>Inject / clear faults (operator panel)</h3>
       <div class="fbtns" id="fbtns"></div>
-      <h3>AI assistant — recent recommendations</h3>
-      <table><thead><tr><th style="width:120px">Severity</th><th style="width:220px">Fault</th><th>Recommendation</th></tr></thead>
-      <tbody id="alist"><tr><td colspan="3" style="color:var(--muted)">No alarms yet.</td></tr></tbody></table>
+      <h3 style="display:flex;align-items:center;justify-content:space-between">
+        <span>AI assistant — recent recommendations</span>
+        <button id="clearAlarms" class="clrbtn">&#128465; Clear list</button>
+      </h3>
+      <table><thead><tr><th style="width:90px">Time</th><th style="width:90px">Severity</th><th style="width:200px">Fault</th><th>Recommendation</th></tr></thead>
+      <tbody id="alist"><tr><td colspan="4" style="color:var(--muted)">No alarms yet.</td></tr></tbody></table>
     </div>
   </div>
 
@@ -291,10 +296,16 @@ async function tick(){
   updateHorn(pct<8 || pct>96 || phEx || !fresh);
 
   // alarms list
-  const tb=$('#alist'); const a=s.alarms||[];
+  const tb=$('#alist'); const a=(s.alarms||[]).filter(x=>!x.cleared);
   if(a.length){
-    tb.innerHTML=a.map(x=>`<tr><td><span class="sev ${x.severity||'info'}">${(x.severity||'info').toUpperCase()}</span></td>
-      <td>${x.fault||''}</td><td>${x.diagnosis||''}${x.actions&&x.actions.length?'<br>• '+x.actions.join('<br>• '):''}</td></tr>`).join('');
+    tb.innerHTML=a.map(x=>{
+      const tm=x.ts?new Date(x.ts*1000).toLocaleTimeString():'';
+      const rec=(x.diagnosis||'')+(x.actions&&x.actions.length?'<br>• '+x.actions.join('<br>• '):'');
+      return `<tr><td>${tm}</td><td><span class="sev ${x.severity||'info'}">${(x.severity||'info').toUpperCase()}</span></td>`
+        +`<td>${x.fault||''}</td><td>${rec}</td></tr>`;
+    }).join('');
+  } else {
+    tb.innerHTML='<tr><td colspan="4" style="color:var(--muted)">No alarms yet.</td></tr>';
   }
 }
 // ---- audible alarm horn (Web Audio, no files needed) ----
@@ -319,6 +330,7 @@ function updateHorn(active){
   else if(!sounding && hornTimer){clearInterval(hornTimer); hornTimer=null;}
 }
 $('#ackBtn').onclick=()=>{enableAudio(); silenced=true; updateHorn(prevAlarm);};
+$('#clearAlarms').onclick=async()=>{try{await fetch('/api/alarms/clear',{method:'POST'});}catch(e){} tick();};
 
 setInterval(tick,500); tick();
 </script>

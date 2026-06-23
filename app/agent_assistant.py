@@ -72,7 +72,9 @@ def recommend(fault: str, detail: str, snapshot: dict) -> dict:
     if ANTHROPIC_API_KEY:
         try:
             import anthropic
-            client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+            # short timeout + no long retry storm: a hung/throttled call fails
+            # fast and falls back to the playbook instead of freezing the agent
+            client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY, timeout=20.0, max_retries=1)
             user = (f"Detected fault: {fault}\nDetector detail: {detail}\n"
                     f"Recent tag snapshot:\n{json.dumps(snapshot, indent=2)}")
             msg = client.messages.create(
