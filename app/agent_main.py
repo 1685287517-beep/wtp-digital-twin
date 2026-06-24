@@ -54,16 +54,17 @@ def main():
         print("=" * 70, flush=True)
 
     def evaluate_and_announce():
-        # snapshot under the lock, then do detection + LLM OUTSIDE the lock so a
-        # slow Claude call can never freeze telemetry processing
+        # Detection runs UNDER the lock so the detector's debounce timers aren't
+        # raced by the MQTT thread and the watchdog thread calling it at once.
+        # The slow part (the Claude call in announce) stays OUTSIDE the lock, so
+        # it still can't freeze telemetry processing.
         with lock:
             snap = dict(last_snapshot)
-        if not snap:
-            return
-        results = detector.evaluate(snap)
-        found = {f for f, _ in results}
-        details = {f: d for f, d in results}
-        with lock:
+            if not snap:
+                return
+            results = detector.evaluate(snap)
+            found = {f for f, _ in results}
+            details = {f: d for f, d in results}
             new = found - active_faults
             cleared = active_faults - found
             active_faults.clear()
@@ -83,7 +84,7 @@ def main():
             payload = json.loads(msg.payload)
             with lock:
                 last_snapshot = payload["tags"]
-            detector.on_telemetry(payload["tags"])
+                detector.on_telemetry(payload["tags"])   # detector access serialized
             evaluate_and_announce()
         except Exception as exc:  # noqa: BLE001
             print(f"[agent] msg error: {exc}", flush=True)
