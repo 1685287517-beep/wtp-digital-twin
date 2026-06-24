@@ -43,6 +43,10 @@ def main():
     print(f"[tb] forwarding to {TB_HOST}:{TB_PORT} every {TB_PERIOD}s", flush=True)
 
     last_sent = 0.0
+    # current AI fault state — included in EVERY telemetry push so the cloud
+    # alarm rule always sees a real fault_active (never a stale/default value)
+    fault = {"fault_active": 0, "active_fault": "", "fault_severity": "",
+             "fault_recommendation": ""}
 
     def on_message(_c, _u, msg):
         nonlocal last_sent
@@ -50,27 +54,31 @@ def main():
         try:
             payload = json.loads(msg.payload)
             if msg.topic == TOPIC_AGENT:
-                # AI fault events -> forward immediately (not throttled) so the
-                # cloud rule engine can raise/clear an alarm with the advice
+                # update the latched fault state and push it immediately
                 if payload.get("cleared"):
-                    vals = {"fault_active": 0, "active_fault": "", "fault_recommendation": ""}
+                    fault.update(fault_active=0, active_fault="", fault_recommendation="")
                 else:
-                    vals = {
-                        "fault_active": 1,
-                        "active_fault": payload.get("fault", ""),
-                        "fault_severity": payload.get("severity", "warning"),
-                        "fault_recommendation": (payload.get("diagnosis", "") + " | " +
-                                                 "; ".join(payload.get("actions", []))),
-                    }
-                tb.publish(TB_TOPIC, json.dumps({"ts": int(now * 1000), "values": vals}), qos=1)
+                    fault.update(
+                        fault_active=1,
+                        active_fault=payload.get("fault", ""),
+                        fault_severity=payload.get("severity", "warning"),
+                        fault_recommendation=(payload.get("diagnosis", "") + " | " +
+                                              "; ".join(payload.get("actions", []))),
+                    )
+                tb.publish(TB_TOPIC, json.dumps({"ts": int(now * 1000), "values": dict(fault)}), qos=1)
+                print(f"[tb] forwarded fault to cloud: {fault['active_fault']} "
+                      f"(fault_active={fault['fault_active']})", flush=True)
                 return
 
             # high-rate telemetry -> throttle to stay within free-tier limits
             if now - last_sent < TB_PERIOD:
                 return
             last_sent = now
-            body = {"ts": int(payload.get("ts", now) * 1000), "values": payload.get("tags", {})}
-            tb.publish(TB_TOPIC, json.dumps(body), qos=0)
+            values = dict(payload.get("tags", {}))
+            values["fault_active"] = fault["fault_active"]      # always present
+            values["active_fault"] = fault["active_fault"]
+            tb.publish(TB_TOPIC, json.dumps({"ts": int(payload.get("ts", now) * 1000),
+                                             "values": values}), qos=0)
         except Exception as exc:  # noqa: BLE001
             print(f"[tb] forward error: {exc}", flush=True)
 

@@ -146,8 +146,9 @@ See [`faults/catalog.md`](faults/catalog.md). One per Purdue layer:
 
 | Name | Matriculation | Cohort | Area of ownership |
 |------|---------------|--------|-------------------|
-| _TODO_ | | | Process model + PLC |
+| _TODO_ | | | Process model + physics |
+| _TODO_ | | | PLC control (on/off · PID · state machine) |
 | _TODO_ | | | MQTT + historian + Grafana |
-| _TODO_ | | | AI agent + HMI |
-| _TODO_ | | | Cloud (ThingsBoard) + Telegram |
-| _TODO_ | | | Fault injection + docs + presentation |
+| _TODO_ | | | AI agent + fault detection |
+| _TODO_ | | | SCADA HMI + operator controls |
+| _TODO_ | | | Cloud (ThingsBoard) + Telegram + presentation |
