@@ -55,6 +55,8 @@ def main():
     def on_message(_c, _u, msg):
         try:
             p = json.loads(msg.payload)
+            if p.get("preliminary"):
+                return  # wait for the enriched LLM message; send one good alert
             if p.get("cleared"):
                 send(f"✅ CLEARED — {p.get('fault', '')} is back to normal.")
             else:

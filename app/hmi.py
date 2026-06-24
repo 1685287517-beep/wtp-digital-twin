@@ -20,12 +20,14 @@ from app.config import (
     MQTT_HOST, MQTT_PORT, TOPIC_TELEMETRY, TOPIC_AGENT,
     TOPIC_CONTROL_OP, TOPIC_CONTROL,
 )
+from app.faults import KNOWN_FAULTS
 
 app = FastAPI()
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 _state = {"tags": {}, "ts": 0}
-_alarms = []          # most-recent-first
+_alarms = []          # most-recent-first (one row per fault, latest wins)
+_active = set()       # faults currently active (drives the instant horn)
 _lock = threading.Lock()
 
 mc = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="wtp-hmi")
@@ -38,11 +40,17 @@ def _on_message(_c, _u, msg):
         if msg.topic == TOPIC_TELEMETRY:
             with _lock:
                 _state = payload
-        elif msg.topic == TOPIC_AGENT and not payload.get("cleared"):
-            # 'cleared' events are for the cloud bridge, not the operator list
+        elif msg.topic == TOPIC_AGENT:
+            f = payload.get("fault", "")
             with _lock:
-                _alarms.insert(0, payload)
-                del _alarms[30:]
+                if payload.get("cleared"):
+                    _active.discard(f)
+                else:
+                    _active.add(f)
+                    # one row per fault — the LLM update replaces the instant one
+                    _alarms[:] = [a for a in _alarms if a.get("fault") != f]
+                    _alarms.insert(0, payload)
+                    del _alarms[30:]
     except Exception:  # noqa: BLE001
         pass
 
@@ -66,13 +74,21 @@ def index():
 def state():
     with _lock:
         return {"tags": _state.get("tags", {}), "ts": _state.get("ts", 0),
-                "alarms": list(_alarms)}
+                "alarms": list(_alarms), "active_faults": sorted(_active)}
 
 
 @app.post("/api/alarms/clear")
 def clear_alarms():
     with _lock:
         _alarms.clear()
+    return {"ok": True}
+
+
+@app.post("/api/faults/clear-all")
+def clear_all_faults():
+    # one-click reset: clear every fault so the demo starts from a clean state
+    for f in KNOWN_FAULTS:
+        mc.publish(TOPIC_CONTROL, json.dumps({"fault": f, "active": False}))
     return {"ok": True}
 
 

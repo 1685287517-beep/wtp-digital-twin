@@ -13,7 +13,7 @@ import json
 import threading
 import time
 
-from app.agent_assistant import recommend
+from app.agent_assistant import recommend, playbook, llm_enabled
 from app.agent_detector import Detector
 from app.bus import make_client, publish_json
 from app.config import TOPIC_TELEMETRY, TOPIC_AGENT
@@ -29,29 +29,34 @@ def main():
 
     client = make_client("wtp-agent")
 
-    def announce(fault, detail, snapshot):
-        rec = recommend(fault, detail, snapshot)
-        out = {
-            "ts": time.time(),
-            "fault": fault,
-            "detail": detail,
+    def _build(fault, detail, rec, preliminary):
+        return {
+            "ts": time.time(), "fault": fault, "detail": detail,
+            "preliminary": preliminary,
             "severity": rec.get("severity", "warning"),
             "diagnosis": rec.get("diagnosis", ""),
             "actions": rec.get("actions", []),
             "reasoning": rec.get("reasoning", ""),
-            # flattened for the historian field
             "recommendation": rec.get("diagnosis", "") + " | " +
                               "; ".join(rec.get("actions", [])),
         }
-        publish_json(client, TOPIC_AGENT, out)
-        print("\n" + "=" * 70, flush=True)
-        print(f"[AGENT] {out['severity'].upper()}  fault={fault}", flush=True)
-        print(f"  why detected: {detail}", flush=True)
-        print(f"  diagnosis   : {out['diagnosis']}", flush=True)
-        for a in out["actions"]:
-            print(f"    - {a}", flush=True)
-        print(f"  reasoning   : {out['reasoning']}", flush=True)
-        print("=" * 70, flush=True)
+
+    def announce(fault, detail, snapshot):
+        # 1) raise the alarm IMMEDIATELY with the offline playbook (no network),
+        #    so the HMI horn/LEDs, cloud and operator see it within detection time
+        pb = playbook(fault, detail)
+        publish_json(client, TOPIC_AGENT, _build(fault, detail, pb, preliminary=llm_enabled()))
+        print(f"\n[AGENT] {pb['severity'].upper()}  fault={fault}  (alarm raised)", flush=True)
+        # 2) enrich with the LLM (slower); publish the upgraded recommendation
+        if llm_enabled():
+            rec = recommend(fault, detail, snapshot)
+            out = _build(fault, detail, rec, preliminary=False)
+            publish_json(client, TOPIC_AGENT, out)
+            print(f"[AGENT] {fault} — AI advice ready:", flush=True)
+            print(f"  diagnosis : {out['diagnosis']}", flush=True)
+            for a in out["actions"]:
+                print(f"    - {a}", flush=True)
+            print(f"  reasoning : {out['reasoning']}", flush=True)
 
     def evaluate_and_announce():
         # Detection runs UNDER the lock so the detector's debounce timers aren't

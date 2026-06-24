@@ -207,6 +207,7 @@
     <div class="apanel">
       <h3>Inject / clear faults (operator panel)</h3>
       <div class="fbtns" id="fbtns"></div>
+      <button id="clearAllFaults" class="clrbtn" style="margin-top:12px">&#10227; Reset — clear ALL faults</button>
       <h3 style="display:flex;align-items:center;justify-content:space-between">
         <span>AI assistant — recent recommendations</span>
         <button id="clearAlarms" class="clrbtn">&#128465; Clear list</button>
@@ -292,8 +293,9 @@ async function tick(){
   const phEx = ph!=null&&(ph<6||ph>8);
   ind('al-LL',pct<8); ind('al-L',pct<15); ind('al-H',pct>88); ind('al-HH',pct>96);
   ind('al-PHL',ph!=null&&ph<6); ind('al-PHH',ph!=null&&ph>8); ind('al-ST',!fresh);
-  // sound the horn only for serious alarms (LL/HH, pH excursion, data loss)
-  updateHorn(pct<8 || pct>96 || phEx || !fresh);
+  // sound the horn for serious telemetry alarms OR any active AI-detected fault
+  const agentActive = (s.active_faults && s.active_faults.length > 0);
+  updateHorn(pct<8 || pct>96 || phEx || !fresh || agentActive);
 
   // alarms list
   const tb=$('#alist'); const a=(s.alarms||[]).filter(x=>!x.cleared);
@@ -331,6 +333,7 @@ function updateHorn(active){
 }
 $('#ackBtn').onclick=()=>{enableAudio(); silenced=true; updateHorn(prevAlarm);};
 $('#clearAlarms').onclick=async()=>{try{await fetch('/api/alarms/clear',{method:'POST'});}catch(e){} tick();};
+$('#clearAllFaults').onclick=async()=>{try{await fetch('/api/faults/clear-all',{method:'POST'});}catch(e){}};
 
 setInterval(tick,500); tick();
 </script>

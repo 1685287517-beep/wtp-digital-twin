@@ -91,6 +91,16 @@ def recommend(fault: str, detail: str, snapshot: dict) -> dict:
         except Exception as exc:  # noqa: BLE001 - demo must keep running
             print(f"[assistant] LLM unavailable ({exc}); using playbook", flush=True)
 
+    return playbook(fault, detail)
+
+
+def llm_enabled() -> bool:
+    return bool(ANTHROPIC_API_KEY)
+
+
+def playbook(fault: str, detail: str) -> dict:
+    """Instant, offline recommendation — used to raise the alarm immediately
+    while the (slower) LLM advice is still being generated."""
     return PLAYBOOK.get(fault, {
         "severity": "warning",
         "diagnosis": f"Unrecognised fault {fault}.",
