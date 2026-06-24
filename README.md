@@ -7,9 +7,6 @@ a full industrial stack — field → PLC → MQTT → historian → dashboards 
 actions in plain language, surfaced through **three alarm channels**: an animated
 SCADA HMI, a ThingsBoard Cloud dashboard, and Telegram push notifications.
 
-> ⚠️ **Viva note (AI use policy §8):** every team member must be able to explain
-> any line of this code. See [`docs/系统原理.md`](docs/系统原理.md) for a plain-language
-> walkthrough of how it all works.
 
 ## Architecture
 
