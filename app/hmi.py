@@ -86,9 +86,13 @@ def clear_alarms():
 
 @app.post("/api/faults/clear-all")
 def clear_all_faults():
-    # one-click reset: clear every fault so the demo starts from a clean state
+    # one-click reset: clear every fault in the sim AND drop any latched alarm
+    # state here, so a stale 'active' fault can't keep the horn sounding
     for f in KNOWN_FAULTS:
         mc.publish(TOPIC_CONTROL, json.dumps({"fault": f, "active": False}))
+    with _lock:
+        _active.clear()
+        _alarms.clear()
     return {"ok": True}
 
 

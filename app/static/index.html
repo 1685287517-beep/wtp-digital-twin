@@ -72,7 +72,9 @@
   .sev.warning{background:#5a4012;color:#ffce82}
   .sev.info{background:#143a5a;color:#9ccbef}
   .fbtns{margin:6px 0 18px}
-  .fbtns button{margin-right:8px;margin-top:8px;padding:7px 12px;border:1px solid var(--line);background:#16334a;color:#cfe6f5;border-radius:4px;cursor:pointer;font-family:inherit;font-size:12px}
+  .fbtns button{margin-right:8px;margin-top:8px;padding:7px 12px;border:1px solid var(--line);background:#16334a;color:#cfe6f5;border-radius:4px;cursor:pointer;font-family:inherit;font-size:12px;transition:background .1s,transform .1s}
+  .fbtns button.flash{background:#2f6e9c;color:#fff;transform:scale(.94)}
+  .fbtns button[data-inject].on{background:var(--red);color:#fff;border-color:#ff8a8a}
   .clrbtn{padding:6px 12px;border:1px solid var(--line);background:#16334a;color:#cfe6f5;border-radius:4px;cursor:pointer;font-family:inherit;font-size:12px}
   .clrbtn:hover{background:#1d4263}
   iframe{width:100%;height:78vh;border:0;background:#111}
@@ -238,9 +240,18 @@ $$('.ctl').forEach(c=>{
 const FAULTS=[['SENSOR_LEVEL_STUCK','Sensor: level stuck'],['EQUIP_PUMP_NO_FLOW','Equip: pump no flow'],
               ['PROCESS_PH_EXCURSION','Process: pH excursion'],['INFRA_MQTT_STALE','Infra: data stale']];
 const fb=$('#fbtns');
+const injected={};
+function flash(btn,txt){
+  btn.classList.add('flash');
+  const old=btn.textContent; if(txt){btn.textContent=txt;}
+  setTimeout(()=>{btn.classList.remove('flash'); if(txt) btn.textContent=old;},500);
+}
+function refreshFaultBtns(){ $$('[data-inject]').forEach(b=>b.classList.toggle('on',!!injected[b.dataset.inject])); }
 FAULTS.forEach(([k,lbl])=>{
-  const on=document.createElement('button'); on.textContent='▶ '+lbl; on.onclick=()=>post('/api/fault',{fault:k,active:true});
-  const off=document.createElement('button'); off.textContent='■ clear'; off.style.opacity=.7; off.onclick=()=>post('/api/fault',{fault:k,active:false});
+  const on=document.createElement('button'); on.dataset.inject=k; on.textContent='▶ '+lbl;
+  on.onclick=()=>{flash(on,'sent ✓'); injected[k]=true; refreshFaultBtns(); post('/api/fault',{fault:k,active:true});};
+  const off=document.createElement('button'); off.textContent='■ clear'; off.style.opacity=.7;
+  off.onclick=()=>{flash(off,'cleared ✓'); injected[k]=false; refreshFaultBtns(); post('/api/fault',{fault:k,active:false});};
   fb.appendChild(on); fb.appendChild(off);
 });
 
@@ -333,7 +344,11 @@ function updateHorn(active){
 }
 $('#ackBtn').onclick=()=>{enableAudio(); silenced=true; updateHorn(prevAlarm);};
 $('#clearAlarms').onclick=async()=>{try{await fetch('/api/alarms/clear',{method:'POST'});}catch(e){} tick();};
-$('#clearAllFaults').onclick=async()=>{try{await fetch('/api/faults/clear-all',{method:'POST'});}catch(e){}};
+$('#clearAllFaults').onclick=async()=>{
+  flash($('#clearAllFaults'),'✓ all cleared');
+  Object.keys(injected).forEach(k=>injected[k]=false); refreshFaultBtns();
+  try{await fetch('/api/faults/clear-all',{method:'POST'});}catch(e){}
+};
 
 setInterval(tick,500); tick();
 </script>
